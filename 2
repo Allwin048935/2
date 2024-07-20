@@ -17,36 +17,38 @@ def fetch_binance_data(symbol, timeframe='1h', limit=100):
         print(f"Error fetching data: {e}")
         return pd.DataFrame()
 
-def calculate_support_resistance(data, column='close'):
-    x = np.arange(len(data))
-    y = data[column].values
+def calculate_pivot_points(data):
+    # Calculate pivot point and support/resistance levels
+    last_row = data.iloc[-1]
+    high = last_row['high']
+    low = last_row['low']
+    close = last_row['close']
+    
+    pivot_point = (high + low + close) / 3
+    resistance1 = 2 * pivot_point - low
+    support1 = 2 * pivot_point - high
+    resistance2 = pivot_point + (high - low)
+    support2 = pivot_point - (high - low)
+    
+    return pivot_point, resistance1, support1, resistance2, support2
 
-    # Find the maximum and minimum values to approximate resistance and support
-    resistance = y.max()
-    support = np.min(y[:-10])  # Use the last 10 values to avoid noise
-
-    # Calculate slope for the support line
-    support_x = np.arange(len(data) - 10, len(data))
-    support_y = y[-10:]
-    fit = np.polyfit(support_x, support_y, 1)
-    support_line = np.polyval(fit, x)
-
-    return resistance, support_line
-
-def detect_breakout(data, resistance, column='close'):
-    breakout = data[data[column] > resistance]
+def detect_breakout(data, resistance):
+    breakout = data[data['close'] > resistance]
     return breakout
 
-def plot_triangle(data, resistance, support_line, breakout, filename='triangle_breakout.png'):
+def plot_pivot_points(data, pivot_point, resistance1, support1, resistance2, support2, breakout, filename='pivot_breakout.png'):
     plt.figure(figsize=(12, 6))
     plt.plot(data['timestamp'], data['close'], label='Close Price')
-    plt.plot(data['timestamp'], [resistance] * len(data), label='Resistance Line', linestyle='--', color='red')
-    plt.plot(data['timestamp'], support_line, label='Support Line', linestyle='--', color='green')
+    plt.axhline(pivot_point, color='gray', linestyle='--', label='Pivot Point')
+    plt.axhline(resistance1, color='red', linestyle='--', label='Resistance 1')
+    plt.axhline(support1, color='green', linestyle='--', label='Support 1')
+    plt.axhline(resistance2, color='red', linestyle='-.', label='Resistance 2')
+    plt.axhline(support2, color='green', linestyle='-.', label='Support 2')
     plt.scatter(breakout['timestamp'], breakout['close'], color='blue', label='Breakout Points')
     plt.xlabel('Timestamp')
     plt.ylabel('Price')
     plt.legend()
-    plt.title('Ascending Triangle Breakout Detection')
+    plt.title('Pivot Points Breakout Detection')
     plt.savefig(filename)
     plt.show()
 
@@ -62,17 +64,17 @@ def main():
     symbol = 'BTC/USDT'
     timeframe = '1h'
     token = '7124807761:AAFeEIuLTN1VzLyunmVU4m-uEcLhaRQLN_Y'  # Hard-coded token
-    chat_id = '1385370555'  # Hard-coded chat ID
+    chat_id = '1385370555  # Hard-coded chat ID
     
     data = fetch_binance_data(symbol, timeframe)
     if data.empty:
         print("No data fetched.")
         return
 
-    resistance, support_line = calculate_support_resistance(data)
-    breakout = detect_breakout(data, resistance)
-    filename = 'triangle_breakout.png'
-    plot_triangle(data, resistance, support_line, breakout, filename)
+    pivot_point, resistance1, support1, resistance2, support2 = calculate_pivot_points(data)
+    breakout = detect_breakout(data, resistance1)
+    filename = 'pivot_breakout.png'
+    plot_pivot_points(data, pivot_point, resistance1, support1, resistance2, support2, breakout, filename)
     
     # Run the async function using asyncio
     asyncio.run(send_image_to_telegram(filename, token, chat_id))
