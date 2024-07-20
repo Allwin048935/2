@@ -2,15 +2,21 @@ import ccxt
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-import datetime
+import os
+import asyncio
 from telegram import Bot
+from telegram.error import TelegramError
 
 def fetch_binance_data(symbol, timeframe='1h', limit=100):
-    binance = ccxt.binance()
-    ohlcv = binance.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
-    data = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-    data['timestamp'] = pd.to_datetime(data['timestamp'], unit='ms')
-    return data
+    try:
+        binance = ccxt.binance()
+        ohlcv = binance.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
+        data = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+        data['timestamp'] = pd.to_datetime(data['timestamp'], unit='ms')
+        return data
+    except Exception as e:
+        print(f"Error fetching data: {e}")
+        return pd.DataFrame()
 
 def calculate_trendline(data, column='close'):
     x = np.arange(len(data))
@@ -35,22 +41,36 @@ def plot_trendline(data, trendline, breakout, filename='trendline_breakout.png')
     plt.savefig(filename)
     plt.show()
 
-def send_image_to_telegram(filename, token, chat_id):
+async def send_image_to_telegram(filename, token, chat_id):
     bot = Bot(token=token)
-    bot.send_photo(chat_id=chat_id, photo=open(filename, 'rb'))
+    try:
+        with open(filename, 'rb') as photo:
+            await bot.send_photo(chat_id=chat_id, photo=photo)
+    except TelegramError as e:
+        print(f"Error sending image to Telegram: {e}")
 
 def main():
     symbol = 'BTC/USDT'
     timeframe = '1h'
-    token = '7124807761:AAFeEIuLTN1VzLyunmVU4m-uEcLhaRQLN_Y'
-    chat_id = '138537055'
+    token = os.getenv('7124807761:AAFeEIuLTN1VzLyunmVU4m-uEcLhaRQLN_Y')  # Store token in environment variable
+    chat_id = os.getenv('138537055')  # Store chat ID in environment variable
+    
+    if not token or not chat_id:
+        print("Telegram token or chat ID is missing.")
+        return
     
     data = fetch_binance_data(symbol, timeframe)
+    if data.empty:
+        print("No data fetched.")
+        return
+
     trendline = calculate_trendline(data)
     breakout = detect_breakout(data, trendline)
     filename = 'trendline_breakout.png'
     plot_trendline(data, trendline, breakout, filename)
-    send_image_to_telegram(filename, token, chat_id)
+    
+    # Run the async function using asyncio
+    asyncio.run(send_image_to_telegram(filename, token, chat_id))
 
 if __name__ == "__main__":
     main()
