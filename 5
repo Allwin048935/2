@@ -24,7 +24,6 @@ def identify_significant_points(data, column='close'):
     significant_highs = data[highs & (data[column] > data[column].shift(-1))]
     significant_lows = data[lows & (data[column] < data[column].shift(-1))]
     
-    # Combine and ensure at least 3 points are selected
     significant_points = pd.concat([significant_highs, significant_lows])
     significant_points = significant_points.sort_index()
     
@@ -37,19 +36,21 @@ def calculate_trendline(data, points, column='close'):
     trendline = np.polyval(fit, np.arange(len(data)))
     return trendline
 
-def detect_breakout(data, trendline):
-    breakout = data[data['close'] > trendline]
-    return breakout
+def detect_breakout_breakdown(data, trendline, breakout_threshold=0.02, breakdown_threshold=0.02):
+    breakout = data[data['close'] > trendline * (1 + breakout_threshold)]
+    breakdown = data[data['close'] < trendline * (1 - breakdown_threshold)]
+    return breakout, breakdown
 
-def plot_trendline(data, trendline, breakout, filename='trendline_breakout.png'):
+def plot_trendline(data, trendline, breakout, breakdown, filename='trendline_breakout.png'):
     plt.figure(figsize=(12, 6))
     plt.plot(data['timestamp'], data['close'], label='Close Price')
     plt.plot(data['timestamp'], trendline, label='Trendline', linestyle='--')
-    plt.scatter(breakout['timestamp'], breakout['close'], color='red', label='Breakout Points')
+    plt.scatter(breakout['timestamp'], breakout['close'], color='green', label='Breakout Points')
+    plt.scatter(breakdown['timestamp'], breakdown['close'], color='red', label='Breakdown Points')
     plt.xlabel('Timestamp')
     plt.ylabel('Price')
     plt.legend()
-    plt.title('Trendline Breakout Detection')
+    plt.title('Trendline Breakout and Breakdown Detection')
     plt.savefig(filename)
     plt.show()
 
@@ -82,9 +83,9 @@ def main():
     selected_points = significant_points.iloc[::len(significant_points)//3]
     
     trendline = calculate_trendline(data, selected_points)
-    breakout = detect_breakout(data, trendline)
+    breakout, breakdown = detect_breakout_breakdown(data, trendline)
     filename = 'trendline_breakout.png'
-    plot_trendline(data, trendline, breakout, filename)
+    plot_trendline(data, trendline, breakout, breakdown, filename)
     
     # Run the async function using asyncio
     asyncio.run(send_image_to_telegram(filename, token, chat_id))
