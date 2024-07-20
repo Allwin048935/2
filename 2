@@ -17,38 +17,41 @@ def fetch_binance_data(symbol, timeframe='1h', limit=100):
         print(f"Error fetching data: {e}")
         return pd.DataFrame()
 
-def calculate_pivot_points(data):
-    # Calculate pivot point and support/resistance levels
-    last_row = data.iloc[-1]
-    high = last_row['high']
-    low = last_row['low']
-    close = last_row['close']
-    
-    pivot_point = (high + low + close) / 3
-    resistance1 = 2 * pivot_point - low
-    support1 = 2 * pivot_point - high
-    resistance2 = pivot_point + (high - low)
-    support2 = pivot_point - (high - low)
-    
-    return pivot_point, resistance1, support1, resistance2, support2
+def calculate_trendlines(data):
+    # Identify high and low points for trendline calculations
+    peaks = data[['timestamp', 'high']].loc[data['high'].rolling(window=10).apply(lambda x: x.argmax() == len(x) - 1)]
+    troughs = data[['timestamp', 'low']].loc[data['low'].rolling(window=10).apply(lambda x: x.argmin() == len(x) - 1)]
+
+    if len(peaks) < 2 or len(troughs) < 2:
+        return None, None
+
+    # Fit trendlines to peaks and troughs
+    x_peaks = np.arange(len(peaks))
+    y_peaks = peaks['high'].values
+    fit_peaks = np.polyfit(x_peaks, y_peaks, 1)
+    trendline_peaks = np.polyval(fit_peaks, np.arange(len(data)))
+
+    x_troughs = np.arange(len(troughs))
+    y_troughs = troughs['low'].values
+    fit_troughs = np.polyfit(x_troughs, y_troughs, 1)
+    trendline_troughs = np.polyval(fit_troughs, np.arange(len(data)))
+
+    return trendline_peaks, trendline_troughs
 
 def detect_breakout(data, resistance):
     breakout = data[data['close'] > resistance]
     return breakout
 
-def plot_pivot_points(data, pivot_point, resistance1, support1, resistance2, support2, breakout, filename='pivot_breakout.png'):
+def plot_trendlines(data, trendline_peaks, trendline_troughs, breakout, filename='triangle_breakout.png'):
     plt.figure(figsize=(12, 6))
     plt.plot(data['timestamp'], data['close'], label='Close Price')
-    plt.axhline(pivot_point, color='gray', linestyle='--', label='Pivot Point')
-    plt.axhline(resistance1, color='red', linestyle='--', label='Resistance 1')
-    plt.axhline(support1, color='green', linestyle='--', label='Support 1')
-    plt.axhline(resistance2, color='red', linestyle='-.', label='Resistance 2')
-    plt.axhline(support2, color='green', linestyle='-.', label='Support 2')
+    plt.plot(data['timestamp'], trendline_peaks, label='Resistance Trendline', linestyle='--', color='red')
+    plt.plot(data['timestamp'], trendline_troughs, label='Support Trendline', linestyle='--', color='green')
     plt.scatter(breakout['timestamp'], breakout['close'], color='blue', label='Breakout Points')
     plt.xlabel('Timestamp')
     plt.ylabel('Price')
     plt.legend()
-    plt.title('Pivot Points Breakout Detection')
+    plt.title('Ascending Triangle Breakout Detection')
     plt.savefig(filename)
     plt.show()
 
@@ -71,10 +74,16 @@ def main():
         print("No data fetched.")
         return
 
-    pivot_point, resistance1, support1, resistance2, support2 = calculate_pivot_points(data)
-    breakout = detect_breakout(data, resistance1)
-    filename = 'pivot_breakout.png'
-    plot_pivot_points(data, pivot_point, resistance1, support1, resistance2, support2, breakout, filename)
+    trendline_peaks, trendline_troughs = calculate_trendlines(data)
+    if trendline_peaks is None or trendline_troughs is None:
+        print("Not enough data to calculate trendlines.")
+        return
+
+    # Use the latest resistance level (from the peak trendline) as the breakout level
+    resistance = trendline_peaks[-1]
+    breakout = detect_breakout(data, resistance)
+    filename = 'triangle_breakout.png'
+    plot_trendlines(data, trendline_peaks, trendline_troughs, breakout, filename)
     
     # Run the async function using asyncio
     asyncio.run(send_image_to_telegram(filename, token, chat_id))
