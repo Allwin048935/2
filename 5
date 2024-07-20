@@ -70,8 +70,10 @@ def plot_triangles(data, trendlines, breakout_points, breakdown_points, filename
     
     # Plot each triangle
     for (p1, p2) in trendlines:
-        plt.plot([data['timestamp'].iloc[data.index.get_loc(p1.name)], data['timestamp'].iloc[data.index.get_loc(p2.name))], 
-                 [data['close'].iloc[data.index.get_loc(p1.name)], data['close'].iloc[data.index.get_loc(p2.name))], 
+        plt.plot([data['timestamp'].iloc[data.index.get_loc(p1.name)],
+                  data['timestamp'].iloc[data.index.get_loc(p2.name))],
+                 [data['close'].iloc[data.index.get_loc(p1.name)],
+                  data['close'].iloc[data.index.get_loc(p2.name))],
                  linestyle='--', color='blue')
     
     # Plot breakout and breakdown points
