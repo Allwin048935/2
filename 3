@@ -7,7 +7,7 @@ import asyncio
 from telegram import Bot
 from telegram.error import TelegramError
 
-def fetch_binance_data(symbol, timeframe='1h', limit=100):
+def fetch_binance_data(symbol, timeframe='1d', limit=100):
     try:
         binance = ccxt.binance()
         ohlcv = binance.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
@@ -33,6 +33,9 @@ def calculate_slopes(data, length, mult, calcMethod):
     return slope
 
 def calculate_trendlines(data, length, mult, calcMethod):
+    # Calculate slopes
+    slope = calculate_slopes(data, length, mult, calcMethod)
+    
     # Find peaks and troughs
     window_size = length
     peaks = data.iloc[argrelextrema(data['high'].values, np.greater_equal, order=window_size)[0]]
@@ -41,36 +44,34 @@ def calculate_trendlines(data, length, mult, calcMethod):
     if len(peaks) < 2 or len(troughs) < 2:
         return None, None
 
-    # Calculate slopes
-    slope_peaks = calculate_slopes(data, length, mult, calcMethod)
-    slope_troughs = calculate_slopes(data, length, mult, calcMethod)
-    
     # Initialize trendlines
-    upper = np.nan * np.zeros(len(data))
-    lower = np.nan * np.zeros(len(data))
-    
-    # Fit trendlines
+    trendline_peaks = np.full(len(data), np.nan)
+    trendline_troughs = np.full(len(data), np.nan)
+
     for i in range(len(data)):
-        if peaks.index[-1] <= data.index[i]:
-            upper[i] = peaks['high'].iloc[-1] - slope_peaks[i]
-        if troughs.index[-1] <= data.index[i]:
-            lower[i] = troughs['low'].iloc[-1] + slope_troughs[i]
+        if len(peaks) > 1:
+            trendline_peaks[i] = peaks['high'].iloc[-1] - slope.iloc[i]
+        if len(troughs) > 1:
+            trendline_troughs[i] = troughs['low'].iloc[-1] + slope.iloc[i]
 
-    return upper, lower
+    return trendline_peaks, trendline_troughs
 
-def detect_breakouts(data, trendline):
-    return data[data['close'] > trendline]
+def detect_breakouts(data, trendline_peaks, trendline_troughs):
+    breakout_up = data[data['close'] > trendline_peaks]
+    breakout_down = data[data['close'] < trendline_troughs]
+    return breakout_up, breakout_down
 
-def plot_trendlines(data, trendline_peaks, trendline_troughs, breakout, filename='triangle_breakout.png'):
+def plot_trendlines(data, trendline_peaks, trendline_troughs, breakout_up, breakout_down, filename='triangle_breakout.png'):
     plt.figure(figsize=(12, 6))
     plt.plot(data['timestamp'], data['close'], label='Close Price')
     plt.plot(data['timestamp'], trendline_peaks, label='Resistance Trendline', linestyle='--', color='red')
     plt.plot(data['timestamp'], trendline_troughs, label='Support Trendline', linestyle='--', color='green')
-    plt.scatter(breakout['timestamp'], breakout['close'], color='blue', label='Breakout Points')
+    plt.scatter(breakout_up['timestamp'], breakout_up['close'], color='blue', label='Breakout Up Points')
+    plt.scatter(breakout_down['timestamp'], breakout_down['close'], color='orange', label='Breakout Down Points')
     plt.xlabel('Timestamp')
     plt.ylabel('Price')
     plt.legend()
-    plt.title('Ascending Triangle Breakout Detection')
+    plt.title('Trendline Breakout Detection')
     plt.savefig(filename)
     plt.show()
 
@@ -101,11 +102,9 @@ def main():
         print("Not enough data to calculate trendlines.")
         return
 
-    # Use the latest resistance level (from the peak trendline) as the breakout level
-    resistance = trendline_peaks[-1]
-    breakout = detect_breakouts(data, resistance)
+    breakout_up, breakout_down = detect_breakouts(data, trendline_peaks, trendline_troughs)
     filename = 'triangle_breakout.png'
-    plot_trendlines(data, trendline_peaks, trendline_troughs, breakout, filename)
+    plot_trendlines(data, trendline_peaks, trendline_troughs, breakout_up, breakout_down, filename)
     
     # Run the async function using asyncio
     asyncio.run(send_image_to_telegram(filename, token, chat_id))
