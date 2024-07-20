@@ -2,7 +2,6 @@ import ccxt
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-import os
 import asyncio
 from telegram import Bot
 from telegram.error import TelegramError
@@ -52,12 +51,8 @@ async def send_image_to_telegram(filename, token, chat_id):
 def main():
     symbol = 'BTC/USDT'
     timeframe = '1h'
-    token = os.getenv('7124807761:AAFeEIuLTN1VzLyunmVU4m-uEcLhaRQLN_Y')  # Store token in environment variable
-    chat_id = os.getenv('138537055')  # Store chat ID in environment variable
-    
-    if not token or not chat_id:
-        print("Telegram token or chat ID is missing.")
-        return
+    token = '7124807761:AAFeEIuLTN1VzLyunmVU4m-uEcLhaRQLN_Y'  # Hard-coded token
+    chat_id = '138537055'  # Hard-coded chat ID
     
     data = fetch_binance_data(symbol, timeframe)
     if data.empty:
