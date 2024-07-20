@@ -1,0 +1,56 @@
+import ccxt
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+import datetime
+from telegram import Bot
+
+def fetch_binance_data(symbol, timeframe='1h', limit=100):
+    binance = ccxt.binance()
+    ohlcv = binance.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
+    data = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+    data['timestamp'] = pd.to_datetime(data['timestamp'], unit='ms')
+    return data
+
+def calculate_trendline(data, column='close'):
+    x = np.arange(len(data))
+    y = data[column].values
+    fit = np.polyfit(x, y, 1)
+    trendline = np.polyval(fit, x)
+    return trendline
+
+def detect_breakout(data, trendline):
+    breakout = data[data['close'] > trendline]
+    return breakout
+
+def plot_trendline(data, trendline, breakout, filename='trendline_breakout.png'):
+    plt.figure(figsize=(12, 6))
+    plt.plot(data['timestamp'], data['close'], label='Close Price')
+    plt.plot(data['timestamp'], trendline, label='Trendline', linestyle='--')
+    plt.scatter(breakout['timestamp'], breakout['close'], color='red', label='Breakout Points')
+    plt.xlabel('Timestamp')
+    plt.ylabel('Price')
+    plt.legend()
+    plt.title('Trendline Breakout Detection')
+    plt.savefig(filename)
+    plt.show()
+
+def send_image_to_telegram(filename, token, chat_id):
+    bot = Bot(token=token)
+    bot.send_photo(chat_id=chat_id, photo=open(filename, 'rb'))
+
+def main():
+    symbol = 'BTC/USDT'
+    timeframe = '1h'
+    token = 'YOUR_TELEGRAM_BOT_TOKEN'
+    chat_id = 'YOUR_TELEGRAM_CHAT_ID'
+    
+    data = fetch_binance_data(symbol, timeframe)
+    trendline = calculate_trendline(data)
+    breakout = detect_breakout(data, trendline)
+    filename = 'trendline_breakout.png'
+    plot_trendline(data, trendline, breakout, filename)
+    send_image_to_telegram(filename, token, chat_id)
+
+if __name__ == "__main__":
+    main()
