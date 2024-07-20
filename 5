@@ -36,7 +36,7 @@ def calculate_trendline(data, points, column='close'):
     trendline = np.polyval(fit, np.arange(len(data)))
     return trendline
 
-def detect_breakout_breakdown(data, trendline, breakout_threshold=0.02, breakdown_threshold=0.02):
+def detect_breakout_breakdown(data, trendline, breakout_threshold=0.1, breakdown_threshold=0.1):
     breakout = data[data['close'] > trendline * (1 + breakout_threshold)]
     breakdown = data[data['close'] < trendline * (1 - breakdown_threshold)]
     return breakout, breakdown
