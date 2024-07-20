@@ -36,21 +36,36 @@ def calculate_trendline(data, points, column='close'):
     trendline = np.polyval(fit, np.arange(len(data)))
     return trendline
 
-def detect_breakout_breakdown(data, trendline, breakout_threshold=0.1, breakdown_threshold=0.1):
-    breakout = data[data['close'] > trendline * (1 + breakout_threshold)]
-    breakdown = data[data['close'] < trendline * (1 - breakdown_threshold)]
-    return breakout, breakdown
+def detect_breakout_breakdown(data, trendlines, breakout_threshold=0.02, breakdown_threshold=0.02):
+    breakout_points = []
+    breakdown_points = []
+    
+    for trendline in trendlines:
+        breakout = data[data['close'] > trendline * (1 + breakout_threshold)]
+        breakdown = data[data['close'] < trendline * (1 - breakdown_threshold)]
+        breakout_points.append(breakout)
+        breakdown_points.append(breakdown)
+    
+    return breakout_points, breakdown_points
 
-def plot_trendline(data, trendline, breakout, breakdown, filename='trendline_breakout.png'):
+def plot_trendlines(data, trendlines, breakout_points, breakdown_points, filename='trendline_breakout.png'):
     plt.figure(figsize=(12, 6))
     plt.plot(data['timestamp'], data['close'], label='Close Price')
-    plt.plot(data['timestamp'], trendline, label='Trendline', linestyle='--')
-    plt.scatter(breakout['timestamp'], breakout['close'], color='green', label='Breakout Points')
-    plt.scatter(breakdown['timestamp'], breakdown['close'], color='red', label='Breakdown Points')
+    
+    # Plot each trendline
+    for trendline in trendlines:
+        plt.plot(data['timestamp'], trendline, linestyle='--', alpha=0.7)
+    
+    # Plot breakout and breakdown points for each trendline
+    colors = ['green', 'blue', 'red']
+    for i, (breakout, breakdown) in enumerate(zip(breakout_points, breakdown_points)):
+        plt.scatter(breakout['timestamp'], breakout['close'], color=colors[i % len(colors)], label=f'Breakout Points {i+1}')
+        plt.scatter(breakdown['timestamp'], breakdown['close'], color=colors[i % len(colors)], marker='x', label=f'Breakdown Points {i+1}')
+    
     plt.xlabel('Timestamp')
     plt.ylabel('Price')
     plt.legend()
-    plt.title('Trendline Breakout and Breakdown Detection')
+    plt.title('Multiple Trendlines with Breakout and Breakdown Detection')
     plt.savefig(filename)
     plt.show()
 
@@ -76,16 +91,29 @@ def main():
     significant_points = identify_significant_points(data)
     
     if len(significant_points) < 3:
-        print("Not enough significant points to create a trendline.")
+        print("Not enough significant points to create trendlines.")
         return
     
-    # Select at least 3 points
-    selected_points = significant_points.iloc[::len(significant_points)//3]
+    # Split significant points into groups for multiple trendlines
+    num_trendlines = 3  # Number of trendlines you want to create
+    trendlines = []
+    breakout_points = []
+    breakdown_points = []
     
-    trendline = calculate_trendline(data, selected_points)
-    breakout, breakdown = detect_breakout_breakdown(data, trendline)
+    for i in range(num_trendlines):
+        start = i * len(significant_points) // num_trendlines
+        end = (i + 1) * len(significant_points) // num_trendlines
+        selected_points = significant_points.iloc[start:end]
+        
+        if len(selected_points) < 3:
+            continue
+        
+        trendline = calculate_trendline(data, selected_points)
+        trendlines.append(trendline)
+    
+    breakout_points, breakdown_points = detect_breakout_breakdown(data, trendlines)
     filename = 'trendline_breakout.png'
-    plot_trendline(data, trendline, breakout, breakdown, filename)
+    plot_trendlines(data, trendlines, breakout_points, breakdown_points, filename)
     
     # Run the async function using asyncio
     asyncio.run(send_image_to_telegram(filename, token, chat_id))
