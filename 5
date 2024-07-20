@@ -17,7 +17,7 @@ def fetch_binance_data(symbol, timeframe='1h', limit=100):
         print(f"Error fetching data: {e}")
         return pd.DataFrame()
 
-def identify_significant_points(data, column='close'):
+def identify_triangle_points(data, column='close'):
     highs = data[column] > data[column].shift(1)
     lows = data[column] < data[column].shift(1)
     
@@ -29,18 +29,23 @@ def identify_significant_points(data, column='close'):
     
     return significant_points
 
-def calculate_trendline(data, points, column='close'):
-    x = np.array([data.index.get_loc(p) for p in points.index])
-    y = points[column].values
-    fit = np.polyfit(x, y, 1)
-    trendline = np.polyval(fit, np.arange(len(data)))
-    return trendline
+def draw_triangle_lines(data, points):
+    trendlines = []
+    # Select every third point for triangles
+    for i in range(0, len(points) - 2, 3):
+        if i + 2 < len(points):
+            p1, p2, p3 = points.iloc[i:i + 3]
+            trendlines.append((p1, p2))
+            trendlines.append((p2, p3))
+            trendlines.append((p3, p1))
+    return trendlines
 
 def detect_breakout_breakdown(data, trendlines, breakout_threshold=0.02, breakdown_threshold=0.02):
     breakout_points = []
     breakdown_points = []
     
-    for trendline in trendlines:
+    for (p1, p2) in trendlines:
+        trendline = np.linspace(p1[column], p2[column], num=len(data))
         breakout = data[data['close'] > trendline * (1 + breakout_threshold)]
         breakdown = data[data['close'] < trendline * (1 - breakdown_threshold)]
         breakout_points.append(breakout)
@@ -48,16 +53,18 @@ def detect_breakout_breakdown(data, trendlines, breakout_threshold=0.02, breakdo
     
     return breakout_points, breakdown_points
 
-def plot_trendlines(data, trendlines, breakout_points, breakdown_points, filename='trendline_breakout.png'):
+def plot_triangles(data, trendlines, breakout_points, breakdown_points, filename='triangles_breakout.png'):
     plt.figure(figsize=(12, 6))
     plt.plot(data['timestamp'], data['close'], label='Close Price')
     
-    # Plot each trendline
-    for trendline in trendlines:
-        plt.plot(data['timestamp'], trendline, linestyle='--', alpha=0.7)
+    # Plot each triangle
+    for (p1, p2) in trendlines:
+        plt.plot([data['timestamp'].iloc[p1.name], data['timestamp'].iloc[p2.name]], 
+                 [data['close'].iloc[p1.name], data['close'].iloc[p2.name]], 
+                 linestyle='--', color='blue')
     
-    # Plot breakout and breakdown points for each trendline
-    colors = ['green', 'blue', 'red']
+    # Plot breakout and breakdown points
+    colors = ['green', 'red']
     for i, (breakout, breakdown) in enumerate(zip(breakout_points, breakdown_points)):
         plt.scatter(breakout['timestamp'], breakout['close'], color=colors[i % len(colors)], label=f'Breakout Points {i+1}')
         plt.scatter(breakdown['timestamp'], breakdown['close'], color=colors[i % len(colors)], marker='x', label=f'Breakdown Points {i+1}')
@@ -65,7 +72,7 @@ def plot_trendlines(data, trendlines, breakout_points, breakdown_points, filenam
     plt.xlabel('Timestamp')
     plt.ylabel('Price')
     plt.legend()
-    plt.title('Multiple Trendlines with Breakout and Breakdown Detection')
+    plt.title('Triangles with Breakout and Breakdown Detection')
     plt.savefig(filename)
     plt.show()
 
@@ -88,32 +95,16 @@ def main():
         print("No data fetched.")
         return
 
-    significant_points = identify_significant_points(data)
+    significant_points = identify_triangle_points(data)
     
     if len(significant_points) < 3:
-        print("Not enough significant points to create trendlines.")
+        print("Not enough significant points to create triangles.")
         return
     
-    # Split significant points into groups for multiple trendlines
-    num_trendlines = 3  # Number of trendlines you want to create
-    trendlines = []
-    breakout_points = []
-    breakdown_points = []
-    
-    for i in range(num_trendlines):
-        start = i * len(significant_points) // num_trendlines
-        end = (i + 1) * len(significant_points) // num_trendlines
-        selected_points = significant_points.iloc[start:end]
-        
-        if len(selected_points) < 3:
-            continue
-        
-        trendline = calculate_trendline(data, selected_points)
-        trendlines.append(trendline)
-    
+    trendlines = draw_triangle_lines(data, significant_points)
     breakout_points, breakdown_points = detect_breakout_breakdown(data, trendlines)
-    filename = 'trendline_breakout.png'
-    plot_trendlines(data, trendlines, breakout_points, breakdown_points, filename)
+    filename = 'triangles_breakout.png'
+    plot_triangles(data, trendlines, breakout_points, breakdown_points, filename)
     
     # Run the async function using asyncio
     asyncio.run(send_image_to_telegram(filename, token, chat_id))
