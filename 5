@@ -31,10 +31,16 @@ def identify_triangle_points(data, column='close'):
 
 def draw_triangle_lines(data, points):
     trendlines = []
+    # Ensure points are enough to form triangles
+    if len(points) < 3:
+        return trendlines
+    
     # Select every third point for triangles
     for i in range(0, len(points) - 2, 3):
         if i + 2 < len(points):
-            p1, p2, p3 = points.iloc[i:i + 3]
+            p1 = points.iloc[i]
+            p2 = points.iloc[i + 1]
+            p3 = points.iloc[i + 2]
             trendlines.append((p1, p2))
             trendlines.append((p2, p3))
             trendlines.append((p3, p1))
@@ -45,9 +51,14 @@ def detect_breakout_breakdown(data, trendlines, breakout_threshold=0.02, breakdo
     breakdown_points = []
     
     for (p1, p2) in trendlines:
-        trendline = np.linspace(p1[column], p2[column], num=len(data))
+        # Create a linear trendline between p1 and p2
+        x = [data.index.get_loc(p1.name), data.index.get_loc(p2.name)]
+        y = [p1['close'], p2['close']]
+        trendline = np.interp(np.arange(len(data)), x, y)
+        
         breakout = data[data['close'] > trendline * (1 + breakout_threshold)]
         breakdown = data[data['close'] < trendline * (1 - breakdown_threshold)]
+        
         breakout_points.append(breakout)
         breakdown_points.append(breakdown)
     
@@ -59,8 +70,8 @@ def plot_triangles(data, trendlines, breakout_points, breakdown_points, filename
     
     # Plot each triangle
     for (p1, p2) in trendlines:
-        plt.plot([data['timestamp'].iloc[p1.name], data['timestamp'].iloc[p2.name]], 
-                 [data['close'].iloc[p1.name], data['close'].iloc[p2.name]], 
+        plt.plot([data['timestamp'].iloc[data.index.get_loc(p1.name)], data['timestamp'].iloc[data.index.get_loc(p2.name))], 
+                 [data['close'].iloc[data.index.get_loc(p1.name)], data['close'].iloc[data.index.get_loc(p2.name))], 
                  linestyle='--', color='blue')
     
     # Plot breakout and breakdown points
