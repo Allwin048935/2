@@ -5,6 +5,7 @@ import numpy as np
 import asyncio
 from telegram import Bot
 from telegram.error import TelegramError
+from scipy.signal import argrelextrema
 
 def fetch_binance_data(symbol, timeframe='1h', limit=100):
     try:
@@ -18,21 +19,29 @@ def fetch_binance_data(symbol, timeframe='1h', limit=100):
         return pd.DataFrame()
 
 def calculate_trendlines(data):
-    # Identify high and low points for trendline calculations
-    peaks = data[['timestamp', 'high']].loc[data['high'].rolling(window=10).apply(lambda x: x.argmax() == len(x) - 1)]
-    troughs = data[['timestamp', 'low']].loc[data['low'].rolling(window=10).apply(lambda x: x.argmin() == len(x) - 1)]
+    # Identify local maxima (peaks) and minima (troughs)
+    data['high'] = data['high'].astype(float)
+    data['low'] = data['low'].astype(float)
+
+    # Find peaks and troughs
+    window_size = 10
+    data['peaks'] = data.iloc[argrelextrema(data['high'].values, np.greater_equal, order=window_size)[0]]['high']
+    data['troughs'] = data.iloc[argrelextrema(data['low'].values, np.less_equal, order=window_size)[0]]['low']
+
+    peaks = data.dropna(subset=['peaks'])
+    troughs = data.dropna(subset=['troughs'])
 
     if len(peaks) < 2 or len(troughs) < 2:
         return None, None
 
     # Fit trendlines to peaks and troughs
     x_peaks = np.arange(len(peaks))
-    y_peaks = peaks['high'].values
+    y_peaks = peaks['peaks'].values
     fit_peaks = np.polyfit(x_peaks, y_peaks, 1)
     trendline_peaks = np.polyval(fit_peaks, np.arange(len(data)))
 
     x_troughs = np.arange(len(troughs))
-    y_troughs = troughs['low'].values
+    y_troughs = troughs['troughs'].values
     fit_troughs = np.polyfit(x_troughs, y_troughs, 1)
     trendline_troughs = np.polyval(fit_troughs, np.arange(len(data)))
 
