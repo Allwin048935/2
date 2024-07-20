@@ -42,7 +42,7 @@ def send_image_to_telegram(filename, token, chat_id):
 def main():
     symbol = 'BTC/USDT'
     timeframe = '1h'
-    token = 'YOUR_TELEGRAM_BOT_TOKEN'
+    token = '7124807761:AAFeEIuLTN1VzLyunmVU4m-uEcLhaRQLN_Y'
     chat_id = 'YOUR_TELEGRAM_CHAT_ID'
     
     data = fetch_binance_data(symbol, timeframe)
