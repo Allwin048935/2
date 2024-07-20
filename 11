@@ -43,7 +43,7 @@ def main():
     symbol = 'BTC/USDT'
     timeframe = '1h'
     token = '7124807761:AAFeEIuLTN1VzLyunmVU4m-uEcLhaRQLN_Y'
-    chat_id = 'YOUR_TELEGRAM_CHAT_ID'
+    chat_id = '138537055'
     
     data = fetch_binance_data(symbol, timeframe)
     trendline = calculate_trendline(data)
