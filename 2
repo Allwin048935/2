@@ -1,0 +1,81 @@
+import ccxt
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+import asyncio
+from telegram import Bot
+from telegram.error import TelegramError
+
+def fetch_binance_data(symbol, timeframe='1h', limit=100):
+    try:
+        binance = ccxt.binance()
+        ohlcv = binance.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
+        data = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+        data['timestamp'] = pd.to_datetime(data['timestamp'], unit='ms')
+        return data
+    except Exception as e:
+        print(f"Error fetching data: {e}")
+        return pd.DataFrame()
+
+def calculate_support_resistance(data, column='close'):
+    x = np.arange(len(data))
+    y = data[column].values
+
+    # Find the maximum and minimum values to approximate resistance and support
+    resistance = y.max()
+    support = np.min(y[:-10])  # Use the last 10 values to avoid noise
+
+    # Calculate slope for the support line
+    support_x = np.arange(len(data) - 10, len(data))
+    support_y = y[-10:]
+    fit = np.polyfit(support_x, support_y, 1)
+    support_line = np.polyval(fit, x)
+
+    return resistance, support_line
+
+def detect_breakout(data, resistance, column='close'):
+    breakout = data[data[column] > resistance]
+    return breakout
+
+def plot_triangle(data, resistance, support_line, breakout, filename='triangle_breakout.png'):
+    plt.figure(figsize=(12, 6))
+    plt.plot(data['timestamp'], data['close'], label='Close Price')
+    plt.plot(data['timestamp'], [resistance] * len(data), label='Resistance Line', linestyle='--', color='red')
+    plt.plot(data['timestamp'], support_line, label='Support Line', linestyle='--', color='green')
+    plt.scatter(breakout['timestamp'], breakout['close'], color='blue', label='Breakout Points')
+    plt.xlabel('Timestamp')
+    plt.ylabel('Price')
+    plt.legend()
+    plt.title('Ascending Triangle Breakout Detection')
+    plt.savefig(filename)
+    plt.show()
+
+async def send_image_to_telegram(filename, token, chat_id):
+    bot = Bot(token=token)
+    try:
+        with open(filename, 'rb') as photo:
+            await bot.send_photo(chat_id=chat_id, photo=photo)
+    except TelegramError as e:
+        print(f"Error sending image to Telegram: {e}")
+
+def main():
+    symbol = 'BTC/USDT'
+    timeframe = '1h'
+    token = '7124807761:AAFeEIuLTN1VzLyunmVU4m-uEcLhaRQLN_Y'  # Hard-coded token
+    chat_id = '1385370555'  # Hard-coded chat ID
+    
+    data = fetch_binance_data(symbol, timeframe)
+    if data.empty:
+        print("No data fetched.")
+        return
+
+    resistance, support_line = calculate_support_resistance(data)
+    breakout = detect_breakout(data, resistance)
+    filename = 'triangle_breakout.png'
+    plot_triangle(data, resistance, support_line, breakout, filename)
+    
+    # Run the async function using asyncio
+    asyncio.run(send_image_to_telegram(filename, token, chat_id))
+
+if __name__ == "__main__":
+    main()
