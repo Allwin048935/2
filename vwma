@@ -35,9 +35,12 @@ def plot_vwma(data, crossovers, symbol, filename):
     # Plot candlestick chart with VWMAs and crossover points
     apds = [
         mpf.make_addplot(data['vwma_short'], color='orange', linestyle='--'),
-        mpf.make_addplot(data['vwma_long'], color='purple', linestyle='--'),
-        mpf.make_addplot(crossovers['close'], type='scatter', markersize=100, marker='x', color='red')
+        mpf.make_addplot(data['vwma_long'], color='purple', linestyle='--')
     ]
+    scatter_data = pd.Series(crossovers['close'], index=crossovers.index)
+    scatter_apd = mpf.make_addplot(scatter_data, type='scatter', markersize=100, marker='x', color='red')
+    apds.append(scatter_apd)
+
     mpf.plot(data, type='candle', addplot=apds, title=f'VWMA Crossover Detection for {symbol}', style='yahoo', savefig=filename)
 
 async def send_image_to_telegram(filename, token, chat_id):
