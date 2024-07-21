@@ -34,8 +34,8 @@ def detect_vwma_crossover(data, short_period, long_period):
 def plot_vwma(data, crossovers, symbol, filename):
     # Plot candlestick chart with VWMAs and crossover points
     apds = [
-        mpf.make_addplot(data['vwma_short'], color='orange', linestyle='--', linewidth=1.5),
-        mpf.make_addplot(data['vwma_long'], color='purple', linestyle='--', linewidth=1.5),
+        mpf.make_addplot(data['vwma_short'], color='orange', linestyle='--'),
+        mpf.make_addplot(data['vwma_long'], color='purple', linestyle='--'),
         mpf.make_addplot(crossovers['close'], type='scatter', markersize=100, marker='x', color='red')
     ]
     mpf.plot(data, type='candle', addplot=apds, title=f'VWMA Crossover Detection for {symbol}', style='yahoo', savefig=filename)
