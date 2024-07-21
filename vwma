@@ -1,10 +1,10 @@
 import ccxt
 import pandas as pd
-import matplotlib.pyplot as plt
 import numpy as np
 import asyncio
 from telegram import Bot
 from telegram.error import TelegramError
+import mplfinance as mpf
 
 def fetch_binance_data(symbol, timeframe='1h', limit=100):
     try:
@@ -12,6 +12,7 @@ def fetch_binance_data(symbol, timeframe='1h', limit=100):
         ohlcv = binance.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
         data = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
         data['timestamp'] = pd.to_datetime(data['timestamp'], unit='ms')
+        data.set_index('timestamp', inplace=True)
         return data
     except Exception as e:
         print(f"Error fetching data for {symbol}: {e}")
@@ -31,17 +32,13 @@ def detect_vwma_crossover(data, short_period, long_period):
     return crossovers
 
 def plot_vwma(data, crossovers, symbol, filename):
-    plt.figure(figsize=(12, 6))
-    plt.plot(data['timestamp'], data['close'], label='Close Price')
-    plt.plot(data['timestamp'], data['vwma_short'], label='Short-term VWMA', linestyle='--', color='orange')
-    plt.plot(data['timestamp'], data['vwma_long'], label='Long-term VWMA', linestyle='--', color='purple')
-    plt.scatter(crossovers['timestamp'], crossovers['close'], color='red', label='Crossover Points', marker='x')
-    plt.xlabel('Timestamp')
-    plt.ylabel('Price')
-    plt.legend()
-    plt.title(f'VWMA Crossover Detection for {symbol}')
-    plt.savefig(filename)
-    plt.close()
+    # Plot candlestick chart with VWMAs and crossover points
+    apds = [
+        mpf.make_addplot(data['vwma_short'], color='orange', linestyle='--', linewidth=1.5),
+        mpf.make_addplot(data['vwma_long'], color='purple', linestyle='--', linewidth=1.5),
+        mpf.make_addplot(crossovers['close'], type='scatter', markersize=100, marker='x', color='red')
+    ]
+    mpf.plot(data, type='candle', addplot=apds, title=f'VWMA Crossover Detection for {symbol}', style='yahoo', savefig=filename)
 
 async def send_image_to_telegram(filename, token, chat_id):
     bot = Bot(token=token)
