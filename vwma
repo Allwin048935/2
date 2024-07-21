@@ -21,25 +21,27 @@ def calculate_vwma(data, period):
     vwma = (data['close'] * data['volume']).rolling(window=period).sum() / data['volume'].rolling(window=period).sum()
     return vwma
 
-def detect_vwma_crossover(data, short_period, long_period):
+def detect_vwma_cross(data, short_period, long_period):
     data['vwma_short'] = calculate_vwma(data, short_period)
     data['vwma_long'] = calculate_vwma(data, long_period)
     
     data['crossover'] = (data['vwma_short'] > data['vwma_long']).astype(int).diff()
-    crossovers = data[data['crossover'] == 1]  # Detect where short-term VWMA crosses above long-term VWMA
+    crossovers = data[data['crossover'] == 1]  # Short-term VWMA crosses above long-term VWMA
+    crossdowns = data[data['crossover'] == -1]  # Short-term VWMA crosses below long-term VWMA
     
-    return crossovers
+    return crossovers, crossdowns
 
-def plot_vwma(data, crossovers, symbol, filename):
+def plot_vwma(data, crossovers, crossdowns, symbol, filename):
     plt.figure(figsize=(12, 6))
     plt.plot(data['timestamp'], data['close'], label='Close Price')
     plt.plot(data['timestamp'], data['vwma_short'], label='Short-term VWMA', linestyle='--', color='orange')
     plt.plot(data['timestamp'], data['vwma_long'], label='Long-term VWMA', linestyle='--', color='purple')
-    plt.scatter(crossovers['timestamp'], crossovers['close'], color='red', label='Crossover Points', marker='x')
+    plt.scatter(crossovers['timestamp'], crossovers['close'], color='green', label='Crossover Points', marker='x')
+    plt.scatter(crossdowns['timestamp'], crossdowns['close'], color='red', label='Crossdown Points', marker='o')
     plt.xlabel('Timestamp')
     plt.ylabel('Price')
     plt.legend()
-    plt.title(f'VWMA Crossover Detection for {symbol}')
+    plt.title(f'VWMA Crossover and Crossdown Detection for {symbol}')
     plt.savefig(filename)
     plt.close()
 
@@ -57,13 +59,24 @@ async def process_symbol(symbol, timeframe, short_period, long_period, token, ch
         print(f"No data fetched for {symbol}.")
         return
 
-    crossovers = detect_vwma_crossover(data, short_period, long_period)
-    if not crossovers.empty:  # Check if there are any crossovers
-        filename = f'{symbol.replace("/", "_")}_vwma_crossover.png'
-        plot_vwma(data, crossovers, symbol, filename)
-        await send_image_to_telegram(filename, token, chat_id)
+    crossovers, crossdowns = detect_vwma_cross(data, short_period, long_period)
+    if not crossovers.empty or not crossdowns.empty:
+        most_recent_crossover = crossovers.iloc[-1] if not crossovers.empty else None
+        most_recent_crossdown = crossdowns.iloc[-1] if not crossdowns.empty else None
+        
+        most_recent_time = data.iloc[-1]['timestamp']
+        
+        recent_crossover = most_recent_crossover and most_recent_crossover['timestamp'] == most_recent_time
+        recent_crossdown = most_recent_crossdown and most_recent_crossdown['timestamp'] == most_recent_time
+        
+        if recent_crossover or recent_crossdown:
+            filename = f'{symbol.replace("/", "_")}_vwma_crossover_crossdown.png'
+            plot_vwma(data, crossovers, crossdowns, symbol, filename)
+            await send_image_to_telegram(filename, token, chat_id)
+        else:
+            print(f"No recent crossovers or crossdowns detected for {symbol}.")
     else:
-        print(f"No crossovers detected for {symbol}.")
+        print(f"No crossovers or crossdowns detected for {symbol}.")
 
 async def main():
     symbols = [
@@ -75,8 +88,8 @@ async def main():
     token = '7124807761:AAFeEIuLTN1VzLyunmVU4m-uEcLhaRQLN_Y'  # Replace with your actual token
     chat_id = '1385370555'  # Replace with your actual chat ID
 
-    short_period = 3
-    long_period = 7
+    short_period = 20
+    long_period = 50
 
     tasks = [process_symbol(symbol, timeframe, short_period, long_period, token, chat_id) for symbol in symbols]
     await asyncio.gather(*tasks)
