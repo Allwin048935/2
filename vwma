@@ -6,7 +6,7 @@ import asyncio
 from telegram import Bot
 from telegram.error import TelegramError
 
-def fetch_binance_data(symbol, timeframe='1h', limit=100):
+def fetch_binance_data(symbol, timeframe='1m', limit=100):
     try:
         binance = ccxt.binance()
         ohlcv = binance.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
@@ -58,19 +58,25 @@ async def process_symbol(symbol, timeframe, short_period, long_period, token, ch
         return
 
     crossovers = detect_vwma_crossover(data, short_period, long_period)
-    filename = f'{symbol.replace("/", "_")}_vwma_crossover.png'
-    plot_vwma(data, crossovers, symbol, filename)
-    
-    await send_image_to_telegram(filename, token, chat_id)
+    if not crossovers.empty:  # Check if there are any crossovers
+        filename = f'{symbol.replace("/", "_")}_vwma_crossover.png'
+        plot_vwma(data, crossovers, symbol, filename)
+        await send_image_to_telegram(filename, token, chat_id)
+    else:
+        print(f"No crossovers detected for {symbol}.")
 
 async def main():
-    symbols = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT']  # Add more pairs as needed
-    timeframe = '1h'
+    symbols = [
+        'BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'XRP/USDT', 'ADA/USDT', 'SOL/USDT', 
+        'DOGE/USDT', 'DOT/USDT', 'UNI/USDT', 'LTC/USDT', 'LINK/USDT', 'BCH/USDT',
+        'MATIC/USDT', 'XLM/USDT', 'ATOM/USDT', 'ETC/USDT', 'FIL/USDT', 'VET/USDT'
+    ]  # Add more pairs as needed
+    timeframe = '1m'
     token = '7124807761:AAFeEIuLTN1VzLyunmVU4m-uEcLhaRQLN_Y'  # Replace with your actual token
     chat_id = '1385370555'  # Replace with your actual chat ID
 
-    short_period = 20
-    long_period = 50
+    short_period = 3
+    long_period = 7
 
     tasks = [process_symbol(symbol, timeframe, short_period, long_period, token, chat_id) for symbol in symbols]
     await asyncio.gather(*tasks)
