@@ -104,7 +104,7 @@ def main():
     token = config.TELEGRAM_BOT_TOKEN
     chat_id = config.TELEGRAM_CHAT_ID
 
-    schedule.every(15).minutes.do(check_for_breakouts_and_breakdowns, symbols, timeframe, token, chat_id)
+    schedule.every(5).minutes.do(check_for_breakouts_and_breakdowns, symbols, timeframe, token, chat_id)
 
     while True:
         schedule.run_pending()
