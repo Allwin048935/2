@@ -26,8 +26,8 @@ def calculate_trendlines(data, ignore_last=5):
 
     window_size = 10
     valid_data = data.iloc[:-ignore_last].copy()  # Ignore the last few candles and create a copy
-    valid_data.loc[:, 'peaks'] = valid_data.iloc[argrelextrema(valid_data['high'].values, np.greater_equal, order=window_size)[0]]['high']
-    valid_data.loc[:, 'troughs'] = valid_data.iloc[argrelextrema(valid_data['low'].values, np.less_equal, order=window_size)[0]]['low']
+    valid_data['peaks'] = valid_data.iloc[argrelextrema(valid_data['high'].values, np.greater_equal, order=window_size)[0]]['high']
+    valid_data['troughs'] = valid_data.iloc[argrelextrema(valid_data['low'].values, np.less_equal, order=window_size)[0]]['low']
 
     peaks = valid_data.dropna(subset=['peaks'])
     troughs = valid_data.dropna(subset=['troughs'])
@@ -42,15 +42,16 @@ def calculate_trendlines(data, ignore_last=5):
     if len(recent_peaks) < 2 or len(recent_troughs) < 2:
         return None, None
 
-    x_peaks = recent_peaks.index.values
+    # Fit trendlines to the most recent peaks and troughs
+    x_peaks = recent_peaks.index
     y_peaks = recent_peaks['peaks'].values
     fit_peaks = np.polyfit(x_peaks, y_peaks, 1)
-    trendline_peaks = np.polyval(fit_peaks, data.index.values)
+    trendline_peaks = np.polyval(fit_peaks, data.index)
 
-    x_troughs = recent_troughs.index.values
+    x_troughs = recent_troughs.index
     y_troughs = recent_troughs['troughs'].values
     fit_troughs = np.polyfit(x_troughs, y_troughs, 1)
-    trendline_troughs = np.polyval(fit_troughs, data.index.values)
+    trendline_troughs = np.polyval(fit_troughs, data.index)
 
     return trendline_peaks, trendline_troughs
 
