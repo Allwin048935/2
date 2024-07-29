@@ -9,7 +9,7 @@ from telegram.error import TelegramError
 from scipy.signal import argrelextrema
 import config  # Import the config module
 
-def fetch_binance_data(symbol, timeframe='4h', limit=100):
+def fetch_binance_data(symbol, timeframe='8h', limit=100):
     try:
         binance = ccxt.binance()
         ohlcv = binance.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
@@ -34,13 +34,17 @@ def calculate_trendlines(data):
     if len(peaks) < 2 or len(troughs) < 2:
         return None, None
 
-    x_peaks = peaks.index.values
-    y_peaks = peaks['peaks'].values
+    # Focus on the latest points for trendlines
+    recent_peaks = peaks.tail(10)
+    recent_troughs = troughs.tail(10)
+
+    x_peaks = recent_peaks.index.values
+    y_peaks = recent_peaks['peaks'].values
     fit_peaks = np.polyfit(x_peaks, y_peaks, 1)
     trendline_peaks = np.polyval(fit_peaks, data.index.values)
 
-    x_troughs = troughs.index.values
-    y_troughs = troughs['troughs'].values
+    x_troughs = recent_troughs.index.values
+    y_troughs = recent_troughs['troughs'].values
     fit_troughs = np.polyfit(x_troughs, y_troughs, 1)
     trendline_troughs = np.polyval(fit_troughs, data.index.values)
 
@@ -73,7 +77,7 @@ async def send_image_to_telegram(filename, token, chat_id):
 
 def main():
     symbol = 'BTC/USDT'
-    timeframe = '1h'
+    timeframe = '8h'
     token = config.TELEGRAM_TOKEN
     chat_id = config.TELEGRAM_CHAT_ID
     
