@@ -1,4 +1,4 @@
 # config.py
 
-TELEGRAM_TOKEN = 'your_telegram_bot_token'
-TELEGRAM_CHAT_ID = 'your_telegram_chat_id'
+TELEGRAM_TOKEN = '7426543281:AAHu4Qf_KT6sGBaqUJU5ccFKZroHKrVc9R0'
+TELEGRAM_CHAT_ID = '1385370555'
