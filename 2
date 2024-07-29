@@ -25,9 +25,9 @@ def calculate_trendlines(data, ignore_last=5):
     data['low'] = data['low'].astype(float)
 
     window_size = 10
-    valid_data = data.iloc[:-ignore_last]  # Ignore the last few candles
-    valid_data['peaks'] = valid_data.iloc[argrelextrema(valid_data['high'].values, np.greater_equal, order=window_size)[0]]['high']
-    valid_data['troughs'] = valid_data.iloc[argrelextrema(valid_data['low'].values, np.less_equal, order=window_size)[0]]['low']
+    valid_data = data.iloc[:-ignore_last].copy()  # Ignore the last few candles and create a copy
+    valid_data.loc[:, 'peaks'] = valid_data.iloc[argrelextrema(valid_data['high'].values, np.greater_equal, order=window_size)[0]]['high']
+    valid_data.loc[:, 'troughs'] = valid_data.iloc[argrelextrema(valid_data['low'].values, np.less_equal, order=window_size)[0]]['low']
 
     peaks = valid_data.dropna(subset=['peaks'])
     troughs = valid_data.dropna(subset=['troughs'])
