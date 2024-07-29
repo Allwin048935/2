@@ -34,9 +34,12 @@ def calculate_trendlines(data):
     if len(peaks) < 2 or len(troughs) < 2:
         return None, None
 
-    # Focus on the latest points for trendlines
-    recent_peaks = peaks.tail(10)
-    recent_troughs = troughs.tail(10)
+    # Use the two most recent highest and lowest points
+    recent_peaks = peaks.tail(2)
+    recent_troughs = troughs.tail(2)
+
+    if len(recent_peaks) < 2 or len(recent_troughs) < 2:
+        return None, None
 
     x_peaks = recent_peaks.index.values
     y_peaks = recent_peaks['peaks'].values
