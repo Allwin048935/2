@@ -9,7 +9,7 @@ from telegram.error import TelegramError
 from scipy.signal import argrelextrema
 import config  # Import the config module
 
-def fetch_binance_data(symbol, timeframe='1h', limit=100):
+def fetch_binance_data(symbol, timeframe='4h', limit=100):
     try:
         binance = ccxt.binance()
         ohlcv = binance.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
