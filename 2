@@ -3,7 +3,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import asyncio
-import time
 from telegram import Bot
 from telegram.error import TelegramError
 from scipy.signal import argrelextrema
@@ -74,23 +73,22 @@ async def send_image_to_telegram(filename, token, chat_id):
     except TelegramError as e:
         print(f"Error sending image to Telegram: {e}")
 
-async def check_for_breakouts_and_breakdowns(symbols, timeframe, token, chat_id):
-    for symbol in symbols:
-        data = fetch_binance_data(symbol, timeframe)
-        if data.empty:
-            print(f"No data fetched for {symbol}.")
-            continue
+async def check_for_breakouts_and_breakdowns(symbol, timeframe, token, chat_id):
+    data = fetch_binance_data(symbol, timeframe)
+    if data.empty:
+        print(f"No data fetched for {symbol}.")
+        return
 
-        trendline_peaks, trendline_troughs = calculate_trendlines(data)
-        if trendline_peaks is None or trendline_troughs is None:
-            print(f"Not enough data to calculate trendlines for {symbol}.")
-            continue
+    trendline_peaks, trendline_troughs = calculate_trendlines(data)
+    if trendline_peaks is None or trendline_troughs is None:
+        print(f"Not enough data to calculate trendlines for {symbol}.")
+        return
 
-        breakout, breakdown = detect_breakout_breakdown(data, trendline_peaks, trendline_troughs)
-        if not breakout.empty or not breakdown.empty:
-            filename = f'triangle_breakout_breakdown_{symbol.replace("/", "_")}.png'
-            plot_trendlines(data, trendline_peaks, trendline_troughs, breakout, breakdown, symbol, filename)
-            await send_image_to_telegram(filename, token, chat_id)
+    breakout, breakdown = detect_breakout_breakdown(data, trendline_peaks, trendline_troughs)
+    if not breakout.empty or not breakdown.empty:
+        filename = f'triangle_breakout_breakdown_{symbol.replace("/", "_")}.png'
+        plot_trendlines(data, trendline_peaks, trendline_troughs, breakout, breakdown, symbol, filename)
+        await send_image_to_telegram(filename, token, chat_id)
 
 async def main():
     symbols = ['BTC/USDT', 'ETH/USDT', 'AAVE/USDT', 'ACE/USDT', 'ACH/USDT', 'ADA/USDT', 'AEVO/USDT',
@@ -103,8 +101,9 @@ async def main():
     chat_id = config.TELEGRAM_CHAT_ID
 
     while True:
-        await check_for_breakouts_and_breakdowns(symbols, timeframe, token, chat_id)
-        await asyncio.sleep(300)  # Sleep for 5 minutes
+        tasks = [check_for_breakouts_and_breakdowns(symbol, timeframe, token, chat_id) for symbol in symbols]
+        await asyncio.gather(*tasks)
+        await asyncio.sleep(300)  # Sleep for 5 minutes before checking again
 
 if __name__ == "__main__":
     asyncio.run(main())
