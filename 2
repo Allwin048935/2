@@ -7,10 +7,15 @@ from telegram import Bot
 from telegram.error import TelegramError
 from scipy.signal import argrelextrema
 import config
+from datetime import datetime, timedelta
 
+# Global dictionary to store the last alert timestamp for each symbol
 previous_alerts = {}
 
-def fetch_binance_data(symbol, timeframe='1m', limit=100):
+# Cooldown period in hours (e.g., 24 hours)
+ALERT_COOLDOWN_HOURS = 1
+
+def fetch_binance_data(symbol, timeframe='4h', limit=100):
     try:
         binance = ccxt.binance()
         ohlcv = binance.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
@@ -51,15 +56,17 @@ def calculate_trendlines(data, ignore_last=5):
 def detect_breakout_breakdown(data, trendline_peaks, trendline_troughs):
     breakout_indices = data[data['close'] > trendline_peaks].index
     breakdown_indices = data[data['close'] < trendline_troughs].index
-    return breakout_indices, breakdown_indices
+    touching_indices = data[(data['close'] == trendline_peaks) | (data['close'] == trendline_troughs)].index
+    return breakout_indices, breakdown_indices, touching_indices
 
-def plot_trendlines(data, trendline_peaks, trendline_troughs, breakout_indices, breakdown_indices, symbol, filename):
+def plot_trendlines(data, trendline_peaks, trendline_troughs, breakout_indices, breakdown_indices, touching_indices, symbol, filename):
     plt.figure(figsize=(12, 6))
     plt.plot(data['timestamp'], data['close'], label='Close Price')
     plt.plot(data['timestamp'], trendline_peaks, label='Resistance Trendline', linestyle='--', color='red')
     plt.plot(data['timestamp'], trendline_troughs, label='Support Trendline', linestyle='--', color='green')
     plt.scatter(data.loc[breakout_indices]['timestamp'], data.loc[breakout_indices]['close'], color='blue', label='Breakout Points')
     plt.scatter(data.loc[breakdown_indices]['timestamp'], data.loc[breakdown_indices]['close'], color='orange', label='Breakdown Points')
+    plt.scatter(data.loc[touching_indices]['timestamp'], data.loc[touching_indices]['close'], color='purple', label='Touch Points')
     plt.xlabel('Timestamp')
     plt.ylabel('Price')
     plt.legend()
@@ -88,22 +95,20 @@ async def check_for_breakouts_and_breakdowns(symbol, timeframe, token, chat_id):
         print(f"Not enough data to calculate trendlines for {symbol}.")
         return
 
-    breakout_indices, breakdown_indices = detect_breakout_breakdown(data, trendline_peaks, trendline_troughs)
+    breakout_indices, breakdown_indices, touching_indices = detect_breakout_breakdown(data, trendline_peaks, trendline_troughs)
     
-    if not breakout_indices.empty or not breakdown_indices.empty:
-        last_index = max(breakout_indices[-1] if not breakout_indices.empty else -1, breakdown_indices[-1] if not breakdown_indices.empty else -1)
-        if symbol in previous_alerts:
-            last_alert_index = previous_alerts[symbol]
-            if last_index <= last_alert_index:
-                print(f"Alert already sent for {symbol} - Breakout indices: {breakout_indices}, Breakdown indices: {breakdown_indices}")
-                return
-        previous_alerts[symbol] = last_index
-        filename = f'triangle_breakout_breakdown_{symbol.replace("/", "_")}.png'
-        plot_trendlines(data, trendline_peaks, trendline_troughs, breakout_indices, breakdown_indices, symbol, filename)
-        await send_image_to_telegram(filename, token, chat_id)
-    else:
-        if symbol in previous_alerts:
-            del previous_alerts[symbol]
+    last_index = len(data) - 1
+    now = datetime.utcnow()
+
+    if (not breakout_indices.empty and breakout_indices[-1] == last_index) or \
+       (not breakdown_indices.empty and breakdown_indices[-1] == last_index) or \
+       (not touching_indices.empty and touching_indices[-1] == last_index):
+
+        if symbol not in previous_alerts or (now - previous_alerts[symbol]).total_seconds() > ALERT_COOLDOWN_HOURS * 3600:
+            previous_alerts[symbol] = now
+            filename = f'triangle_breakout_breakdown_{symbol.replace("/", "_")}.png'
+            plot_trendlines(data, trendline_peaks, trendline_troughs, breakout_indices, breakdown_indices, touching_indices, symbol, filename)
+            await send_image_to_telegram(filename, token, chat_id)
 
 async def main():
     symbols = ['BTC/USDT', 'ETH/USDT', 'AAVE/USDT', 'ACE/USDT', 'ACH/USDT', 'ADA/USDT', 'AEVO/USDT',
