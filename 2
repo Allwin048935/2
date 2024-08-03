@@ -3,7 +3,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import asyncio
-import schedule
 import time
 from telegram import Bot
 from telegram.error import TelegramError
@@ -75,7 +74,7 @@ async def send_image_to_telegram(filename, token, chat_id):
     except TelegramError as e:
         print(f"Error sending image to Telegram: {e}")
 
-def check_for_breakouts_and_breakdowns(symbols, timeframe, token, chat_id):
+async def check_for_breakouts_and_breakdowns(symbols, timeframe, token, chat_id):
     for symbol in symbols:
         data = fetch_binance_data(symbol, timeframe)
         if data.empty:
@@ -91,24 +90,21 @@ def check_for_breakouts_and_breakdowns(symbols, timeframe, token, chat_id):
         if not breakout.empty or not breakdown.empty:
             filename = f'triangle_breakout_breakdown_{symbol.replace("/", "_")}.png'
             plot_trendlines(data, trendline_peaks, trendline_troughs, breakout, breakdown, symbol, filename)
-            asyncio.run(send_image_to_telegram(filename, token, chat_id))
+            await send_image_to_telegram(filename, token, chat_id)
 
-def main():
+async def main():
     symbols = ['BTC/USDT', 'ETH/USDT', 'AAVE/USDT', 'ACE/USDT', 'ACH/USDT', 'ADA/USDT', 'AEVO/USDT',
-    'AGLD/USDT', 'ALGO/USDT', 'ALICE/USDT', 'ALPHA/USDT',
-    'ALT/USDT', 'AMB/USDT', 'APT/USDT', 'ARB/USDT', 'ARK/USDT',
-    'ARPA/USDT', 'AR/USDT', 'ASTR/USDT', 'ATA/USDT', 'ATOM/USDT',
-    'AUCTION/USDT', 'AVAX/USDT', 'AXL/USDT', 'AXS/USDT', 'BADGER/USDT',
-    'BAKE/USDT', 'BAL/USDT', 'BAND/USDT', 'BAT/USDT', 'BB/USDT']  # List of symbols
+               'AGLD/USDT', 'ALGO/USDT', 'ALICE/USDT', 'ALPHA/USDT', 'ALT/USDT', 'AMB/USDT', 'APT/USDT',
+               'ARB/USDT', 'ARK/USDT', 'ARPA/USDT', 'AR/USDT', 'ASTR/USDT', 'ATA/USDT', 'ATOM/USDT',
+               'AUCTION/USDT', 'AVAX/USDT', 'AXL/USDT', 'AXS/USDT', 'BADGER/USDT', 'BAKE/USDT', 'BAL/USDT',
+               'BAND/USDT', 'BAT/USDT', 'BB/USDT']  # List of symbols
     timeframe = '5m'
     token = config.TELEGRAM_BOT_TOKEN
     chat_id = config.TELEGRAM_CHAT_ID
 
-    schedule.every(5).minutes.do(check_for_breakouts_and_breakdowns, symbols, timeframe, token, chat_id)
-
     while True:
-        schedule.run_pending()
-        time.sleep(1)
+        await check_for_breakouts_and_breakdowns(symbols, timeframe, token, chat_id)
+        await asyncio.sleep(300)  # Sleep for 5 minutes
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
