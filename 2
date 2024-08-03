@@ -63,7 +63,7 @@ def plot_trendlines(data, trendline_peaks, trendline_troughs, breakout, breakdow
     plt.legend()
     plt.title(f'Triangle Breakout/Breakdown Detection for {symbol}')
     plt.savefig(filename)
-    plt.show()
+    plt.close()
 
 async def send_image_to_telegram(filename, token, chat_id):
     bot = Bot(token=token)
@@ -101,8 +101,10 @@ async def main():
     chat_id = config.TELEGRAM_CHAT_ID
 
     while True:
+        print("Checking for breakouts and breakdowns...")
         tasks = [check_for_breakouts_and_breakdowns(symbol, timeframe, token, chat_id) for symbol in symbols]
         await asyncio.gather(*tasks)
+        print("Sleeping for 5 minutes...")
         await asyncio.sleep(300)  # Sleep for 5 minutes before checking again
 
 if __name__ == "__main__":
